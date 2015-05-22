@@ -2,9 +2,10 @@ package main
 
 import (
 	"bitbucket.org/kardianos/osext"
+	"crypto/tls"
 	"fmt"
-	"github.com/nmcclain/ldap"
 	"github.com/docopt/docopt-go"
+	"github.com/nmcclain/ldap"
 	"github.com/vaughan0/go-ini"
 	"log"
 	"log/syslog"
@@ -15,7 +16,7 @@ import (
 	"time"
 )
 
-const version = "1.4"
+const version = "1.5"
 
 var usage = `goklp: OpenSSH Keys LDAP Provider for AuthorizedKeysCommand
 
@@ -25,12 +26,13 @@ Usage:
   goklp --version
 
 Config file is required, named: goklp.ini
-  goklp_ldap_uri          = ldaps://server1:636,ldaps://server2:636   (required)
-  goklp_ldap_bind_dn      = CN=someuser,O=someorg,C=sometld           (required)
-  goklp_ldap_base_dn      = O=someorg,C=sometld                       (required)
-  goklp_ldap_bind_pw      = someSecretPassword                        (required)
-  goklp_ldap_timeout_secs = 10                           (optional - default: 5)
-  goklp_debug             = true                     (optional - default: false)
+  goklp_ldap_uri              = ldaps://server1:636,ldaps://server2:636   (required)
+  goklp_ldap_bind_dn          = CN=someuser,O=someorg,C=sometld           (required)
+  goklp_ldap_base_dn          = O=someorg,C=sometld                       (required)
+  goklp_ldap_bind_pw          = someSecretPassword                        (required)
+  goklp_ldap_timeout_secs     = 10                           (optional - default: 5)
+  goklp_debug                 = true                     (optional - default: false)
+  goklp_insecure_skip_verify  = false                    (optional - default: false)
 
 Options:
   --version       Show version.
@@ -38,13 +40,14 @@ Options:
 `
 
 type opts struct {
-	username           string
-	goklp_ldap_base_dn string
-	goklp_ldap_bind_dn string
-	goklp_ldap_bind_pw string
-	goklp_ldap_uris    []string
-	goklp_debug        bool
-	goklp_ldap_timeout time.Duration
+	username                   string
+	goklp_ldap_base_dn         string
+	goklp_ldap_bind_dn         string
+	goklp_ldap_bind_pw         string
+	goklp_ldap_uris            []string
+	goklp_debug                bool
+	goklp_insecure_skip_verify bool
+	goklp_ldap_timeout         time.Duration
 }
 
 type query struct {
@@ -78,7 +81,7 @@ func main() {
 	log.SetOutput(logger)
 
 	// run ldapsearch
-	keys, err := ldapsearch(o)
+	keys, err := o.ldapsearch()
 	if err != nil {
 		logger.Alert(err.Error())
 	}
@@ -93,7 +96,7 @@ func main() {
 }
 
 ////
-func ldapsearch(o *opts) ([]string, error) {
+func (o *opts) ldapsearch() ([]string, error) {
 	keys := []string{}
 
 	// parallel search
@@ -108,7 +111,7 @@ func ldapsearch(o *opts) ([]string, error) {
 			ldapURL:    server_url,
 		}
 		go func() {
-			sr, err := doquery(q)
+			sr, err := o.doquery(q)
 			if err != nil {
 				return
 			}
@@ -140,7 +143,7 @@ func ldapsearch(o *opts) ([]string, error) {
 }
 
 ////
-func doquery(q query) (*ldap.SearchResult, error) {
+func (o *opts) doquery(q query) (*ldap.SearchResult, error) {
 	sr := &ldap.SearchResult{}
 
 	// parse the ldap URL
@@ -168,7 +171,11 @@ func doquery(q query) (*ldap.SearchResult, error) {
 	// connect to the ldap server
 	var l *ldap.Conn
 	if u.Scheme == "ldaps" {
-		l, err = ldap.DialTLS("tcp", fmt.Sprintf("%s:%d", hostname, port), nil)
+		tlsConfig := tls.Config{}
+		if o.goklp_insecure_skip_verify {
+			tlsConfig.InsecureSkipVerify = true
+		}
+		l, err = ldap.DialTLS("tcp", fmt.Sprintf("%s:%d", hostname, port), &tlsConfig)
 		if err != nil {
 			return sr, err
 		}
@@ -263,8 +270,11 @@ func getOpts() (*opts, error) {
 	o.goklp_ldap_timeout = time.Duration(goklp_ldap_timeout_secs) * time.Second
 
 	// debugging goes to syslog
-	if goklp_debug_str, exists := config[""]["goklp_debug"]; exists && goklp_debug_str == "true" {
+	if s, exists := config[""]["goklp_debug"]; exists && s == "true" {
 		o.goklp_debug = true
+	}
+	if s, exists := config[""]["goklp_insecure_skip_verify"]; exists && s == "true" {
+		o.goklp_insecure_skip_verify = true
 	}
 	return o, nil
 }

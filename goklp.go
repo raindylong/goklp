@@ -1,10 +1,10 @@
 package main
 
 import (
-	"bitbucket.org/kardianos/osext"
 	"crypto/tls"
 	"fmt"
 	"github.com/docopt/docopt-go"
+	"github.com/kardianos/osext"
 	"github.com/nmcclain/ldap"
 	"github.com/vaughan0/go-ini"
 	"log"
@@ -31,6 +31,7 @@ Config file is required, named: goklp.ini
   goklp_ldap_base_dn          = O=someorg,C=sometld                       (required)
   goklp_ldap_bind_pw          = someSecretPassword                        (required)
   goklp_ldap_timeout_secs     = 10                           (optional - default: 5)
+  goklp_ldap_user_attr        = 10                           (optional - default: uid)
   goklp_debug                 = true                     (optional - default: false)
   goklp_insecure_skip_verify  = false                    (optional - default: false)
 
@@ -44,6 +45,7 @@ type opts struct {
 	goklp_ldap_base_dn         string
 	goklp_ldap_bind_dn         string
 	goklp_ldap_bind_pw         string
+	goklp_ldap_user_attr       string
 	goklp_ldap_uris            []string
 	goklp_debug                bool
 	goklp_insecure_skip_verify bool
@@ -104,7 +106,7 @@ func (o *opts) ldapsearch() ([]string, error) {
 	for _, server_url := range o.goklp_ldap_uris {
 		q := query{
 			baseDN:     o.goklp_ldap_base_dn,
-			filter:     fmt.Sprintf("(uid=%s)", o.username),
+			filter:     fmt.Sprintf("(%s=%s)", o.goklp_ldap_user_attr, o.username),
 			Attributes: []string{"sshPublicKey"},
 			user:       o.goklp_ldap_bind_dn,
 			passwd:     o.goklp_ldap_bind_pw,
@@ -224,7 +226,7 @@ func getOpts() (*opts, error) {
 	if err != nil {
 		return o, err
 	}
-	configFile := myDirectory + "goklp.ini"
+	configFile := myDirectory + "/goklp.ini"
 	fileInfo, err := os.Stat(configFile)
 	if err != nil {
 		return o, err
@@ -268,6 +270,13 @@ func getOpts() (*opts, error) {
 		}
 	}
 	o.goklp_ldap_timeout = time.Duration(goklp_ldap_timeout_secs) * time.Second
+
+	goklp_ldap_user_attr, exists := config[""]["goklp_ldap_user_attr"]
+	if !exists {
+		o.goklp_ldap_user_attr = "uid"
+	} else {
+		o.goklp_ldap_user_attr = goklp_ldap_user_attr
+	}
 
 	// debugging goes to syslog
 	if s, exists := config[""]["goklp_debug"]; exists && s == "true" {

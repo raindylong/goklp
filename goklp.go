@@ -32,6 +32,7 @@ Config file is required, named: goklp.ini
   goklp_ldap_bind_pw          = someSecretPassword                        (required)
   goklp_ldap_timeout_secs     = 10                           (optional - default: 5)
   goklp_ldap_user_attr        = 10                           (optional - default: uid)
+  goklp_ldap_keyname		  = sshPublickey							  (required)
   goklp_debug                 = true                     (optional - default: false)
   goklp_insecure_skip_verify  = false                    (optional - default: false)
 
@@ -46,6 +47,7 @@ type opts struct {
 	goklp_ldap_bind_dn         string
 	goklp_ldap_bind_pw         string
 	goklp_ldap_user_attr       string
+	goklp_ldap_keyname         string
 	goklp_ldap_uris            []string
 	goklp_debug                bool
 	goklp_insecure_skip_verify bool
@@ -105,9 +107,10 @@ func (o *opts) ldapsearch() ([]string, error) {
 	ch := make(chan result, 1)
 	for _, server_url := range o.goklp_ldap_uris {
 		q := query{
-			baseDN:     o.goklp_ldap_base_dn,
-			filter:     fmt.Sprintf("(%s=%s)", o.goklp_ldap_user_attr, o.username),
-			Attributes: []string{"sshPublicKey"},
+			baseDN: o.goklp_ldap_base_dn,
+			filter: fmt.Sprintf("(%s=%s)", o.goklp_ldap_user_attr, o.username),
+			//		Attributes: []string{"sshPublickey"},
+			Attributes: []string{o.goklp_ldap_keyname},
 			user:       o.goklp_ldap_bind_dn,
 			passwd:     o.goklp_ldap_bind_pw,
 			ldapURL:    server_url,
@@ -132,7 +135,7 @@ func (o *opts) ldapsearch() ([]string, error) {
 		}
 		if len(r.sr.Entries) == 1 {
 			for _, attr := range r.sr.Entries[0].Attributes {
-				if attr.Name == "sshPublicKey" {
+				if attr.Name == o.goklp_ldap_keyname {
 					keys = append(keys, attr.Values...)
 				}
 			}
@@ -250,6 +253,10 @@ func getOpts() (*opts, error) {
 	o.goklp_ldap_bind_dn, exists = config[""]["goklp_ldap_bind_dn"]
 	if !exists {
 		return o, fmt.Errorf("Config option goklp_ldap_bind_dn is not set.")
+	}
+	o.goklp_ldap_keyname, exists = config[""]["goklp_ldap_keyname"] //add goklp_ldap_keyname check
+	if !exists {
+		return o, fmt.Errorf("Config option goklp_ldap_keyname is not set.")
 	}
 	o.goklp_ldap_base_dn, exists = config[""]["goklp_ldap_base_dn"]
 	if !exists {

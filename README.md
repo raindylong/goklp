@@ -2,9 +2,12 @@
 # goklp: Golang OpenSSH Keys Ldap Provider for AuthorizedKeysCommand
 
 ### Usage:
-1. Setup goklp.ini - must be in same directory as goklp
-1. Test to ensure goklp returns SSH keys: goklp goklp.ini <username>
-1. Add this line to your sshd_config: AuthorizedKeysCommand /path/to/goklp
+    - Setup goklp.ini - must be in same directory as goklp
+    - Test to ensure goklp returns SSH keys: 
+```
+goklp goklp.ini $username
+```
+    - Add this line to your sshd_config: AuthorizedKeysCommand /path/to/goklp
 
 ### goklp.ini config file is required:
 

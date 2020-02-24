@@ -3,7 +3,7 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/docopt/docopt-go"
+	//	"github.com/docopt/docopt-go"
 	"github.com/kardianos/osext"
 	"github.com/nmcclain/ldap"
 	"github.com/vaughan0/go-ini"
@@ -217,28 +217,33 @@ func (o *opts) doquery(q query) (*ldap.SearchResult, error) {
 ////
 func getOpts() (*opts, error) {
 	o := &opts{}
-	arguments, err := docopt.Parse(usage, nil, true, version, false)
-	if err != nil {
-		return o, err
-	}
+	/*
+		arguments, err := docopt.Parse(usage, nil, true, version, false)
+		if err != nil {
+			return o, err
+		}
+	*/
 
-	o.username = arguments["<username>"].(string)
+	// o.username = arguments["<username>"].(string)
+	o.username = os.Args[2]
 
 	// handle config file
 	myDirectory, err := osext.ExecutableFolder()
 	if err != nil {
 		return o, err
 	}
-	configFile := myDirectory + "/goklp.ini"
-	fileInfo, err := os.Stat(configFile)
+	configFile := myDirectory + "/" + os.Args[1]
+	//fileInfo, err := os.Stat(configFile)
 	if err != nil {
 		return o, err
 	}
 
 	// enforce reasonable config file security
-	if !strings.HasSuffix(fileInfo.Mode().String(), "------") {
-		return o, fmt.Errorf("Permissions on goklp.ini are too loose - try a 'chmod 600 goklp.ini'")
-	}
+	/*
+		if !strings.HasSuffix(fileInfo.Mode().String(), "------") {
+			return o, fmt.Errorf("Permissions on goklp.ini are too loose - try a 'chmod 600 goklp.ini'")
+		}
+	*/
 
 	config, err := ini.LoadFile(configFile)
 	if err != nil {
